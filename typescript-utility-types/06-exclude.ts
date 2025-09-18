@@ -1,2 +1,24 @@
 // --- 06: Exclude<T, U> ---
-// Crea un tipo excluyendo de T los tipos que son asignables a U. Útil con uniones.
+// Excluye de un tipo unión los elementos que indiques
+
+// Ejemplo 01:
+type Characters = "Iron Man" | "Thor" | "Loki" | "Hulk" | "Thanos"
+
+type Avengers = Exclude<Characters, "Loki" | "Thanos">
+type Villains = Exclude<Characters, Avengers>
+
+const hero: Avengers = "Thor"
+const villain: Villains = "Thanos"
+
+// Ejemplo 02:
+type Animal =
+  | { kind: "dog"; bark: string }
+  | { kind: "cat"; meow: string }
+  | { kind: "fish"; swimSpeed: number }
+
+type NoCatAllowed = Exclude<Animal, { kind: "cat" }>
+
+const animal: NoCatAllowed = {
+  kind: "dog", // Error
+  bark: 'woooofff'
+}
