@@ -1,0 +1,32 @@
+{
+  "name": "bun-react-template",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.tsx",
+  "module": "src/index.tsx",
+  "scripts": {
+    "dev": "bun --hot src/index.tsx",
+    "build": "bun build ./src/index.html --outdir=dist --sourcemap --target=browser --minify --define:process.env.NODE_ENV='\"production\"' --env='BUN_PUBLIC_*'",
+    "lint": "eslint . --fix",
+    "start": "NODE_ENV=production bun src/index.tsx",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "bun-plugin-tailwind": "0.1.2",
+    "react": "19",
+    "react-dom": "19",
+    "tailwindcss": "4.1.18"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "20.0.11",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.1",
+    "@types/bun": "latest",
+    "@types/react": "19",
+    "@types/react-dom": "19",
+    "eslint": "9.39.2",
+    "neostandard": "0.12.2",
+    "prettier": "3.7.4"
+  }
+}

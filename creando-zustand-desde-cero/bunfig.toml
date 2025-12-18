@@ -1,0 +1,6 @@
+[serve.static]
+env = "BUN_PUBLIC_*"
+plugins = ["bun-plugin-tailwind"]
+
+[test]
+preload = "./happydom.ts"
