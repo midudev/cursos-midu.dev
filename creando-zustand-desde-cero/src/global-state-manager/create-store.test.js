@@ -1,5 +1,5 @@
 import { test, expect, mock, describe } from 'bun:test'
-import { createStore } from './create-store-solucion.js'
+import { createStore } from './create-store.js'
 
 describe('createStore', () => {
   test('should create a store with initial state', () => {
