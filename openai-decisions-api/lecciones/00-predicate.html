@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>00 · predicate — Lecciones de la Decisions API</title>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-pixel/GeistPixelVF.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-mono/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="assets/lesson.css" />
+</head>
+
+<body data-lesson="00">
+<main class="stage">
+  <header>
+    <p class="eyebrow"><b>00</b> Tu primera decisión</p>
+    <h1 class="ch-title">predicate</h1>
+    <p class="ch-desc">Una petición tiene tres partes: <code>model</code>, <code>input</code> y <code>questions</code>. Un <code>predicate</code> devuelve la probabilidad de que algo sea verdad.</p>
+  </header>
+
+  <section class="scene">
+    <article class="card">
+      <header><span><i></i>input</span><span>ticket #4521 · string</span></header>
+      <div class="body"><p class="msg">“<span data-edit="input">Hola, me habéis cobrado dos veces los 49&nbsp;€ del pedido #4521.</span>”</p></div>
+    </article>
+
+    <article class="card" style="--c: var(--predicate)">
+      <header><span><i></i>questions[0] · should_refund</span><span class="tag">predicate</span></header>
+      <div class="body"><p class="msg">Is a refund due? Yes: duplicate or unexplained charge. No: legitimate charge for an excessive or unexpected amount.</p></div>
+    </article>
+
+    <article class="card" id="result" style="--c: var(--predicate)">
+      <header><span><i></i>answers[0].probability</span><span class="verdict" id="verdict" data-live>sin respuesta</span></header>
+      <div class="body meter" id="meter">
+        <b class="val">—</b>
+        <div class="bar"><i></i></div>
+        <div class="split small faint"><span>0 · seguro que no</span><span>0.5</span><span>1 · seguro que sí</span></div>
+      </div>
+    </article>
+  </section>
+</main>
+
+<aside class="panel" aria-label="Editor del ejercicio">
+  <p class="goal"><b>Reto</b><span>Pregunta a <code>gpt-6-luna</code> si corresponde un reembolso.</span></p>
+  <p class="explain"><b>Una probabilidad, no un sí o un no.</b> Las <code>instructions</code> dicen qué cuenta como sí y qué no. El cliente dice que le habéis cobrado dos veces, pero nadie lo ha comprobado. <code>probability</code> es la estimación (de 0 a 1) de que la condición sea verdad. El umbral lo decides tú.</p>
+</aside>
+
+<!--
+  El ejercicio. Las líneas que terminan en  //__ pista  son huecos:
+  el editor las deja vacías y muestra la pista. Lo que va antes del
+  comentario es la solución.
+-->
+<script type="text/plain" id="exercise" data-file="first-decision.js">
+import OpenAI from "openai"
+
+const client = new OpenAI()
+
+const decision = await client.decisions.create({ //__ llama a POST /v1/decisions
+  model: "gpt-6-luna", //__ el único modelo disponible
+  input: "Hola, me habéis cobrado dos veces los 49 € del pedido #4521.", //~ input
+  questions: [
+    {
+      type: "predicate", //__ una pregunta de sí o no
+      name: "should_refund",
+      instructions: "Is a refund due? Yes: duplicate or unexplained charge. No: legitimate charge for an excessive or unexpected amount.",
+    },
+  ],
+})
+
+const [answer] = decision.answers
+console.log(answer.probability) //__ la probabilidad (0 a 1) de que sea verdad
+</script>
+<script>
+  window.renderStage = ({ calls }) => {
+    const a = ui.answers(calls[0]).should_refund
+    const p = a?.probability
+    ui.meter('#meter', p)
+    ui.toggle('#result', 'is-on', p != null)
+    const v = ui.$('#verdict')
+    v.className = 'verdict' + (p == null ? '' : p >= 0.8 ? ' yes' : p <= 0.2 ? ' no' : ' mid')
+    v.textContent = a?.type === 'refusal' ? 'refusal' : p == null ? 'sin respuesta' : p >= 0.8 ? '✓ casi seguro que sí' : p <= 0.2 ? '✗ casi seguro que no' : '~ no está claro'
+  }
+</script>
+<script type="application/json" id="mock">[{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"should_refund","probability":0.93}],"usage":{"input_tokens":183,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":183}}]</script>
+<script src="assets/highlight.js"></script>
+<script src="assets/stage.js"></script>
+<script src="assets/lesson.js"></script>
+</body>
+</html>

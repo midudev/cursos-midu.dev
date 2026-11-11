@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>10 · proyecto final — Lecciones de la Decisions API</title>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-pixel/GeistPixelVF.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-mono/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="assets/lesson.css" />
+<style>
+  .case { display: grid; grid-template-columns: minmax(0, 32%) 1fr; gap: 14px; }
+  .case .stack { align-content: start; }
+  .files { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+  .files span { padding: 4px 8px; border: 1px solid var(--line-2); border-radius: 6px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .grid-4 .body { display: grid; gap: 10px; justify-items: start; }
+  .grid-4 .meter { width: 100%; }
+  .grid-4 .meter .val { font-size: clamp(24px, 2.2vw, 38px); }
+  .grid-4 .pick { font: 400 clamp(18px, 1.6vw, 26px)/1 var(--pixel); color: var(--choice); }
+  .action {
+    display: flex; justify-content: space-between; align-items: center; gap: 16px;
+    padding: 16px 18px; border: 1px solid var(--line-2); border-radius: 12px;
+    font: 400 clamp(20px, 2vw, 34px)/1 var(--pixel);
+    transition: border-color .3s, color .3s;
+  }
+  .action small { font: 400 12px/1.4 var(--mono); color: var(--muted); }
+  .action.auto { border-color: color-mix(in oklab, var(--green) 60%, transparent); color: var(--green); }
+  .action.human { border-color: color-mix(in oklab, var(--amber) 60%, transparent); color: var(--amber); }
+</style>
+</head>
+
+<body data-lesson="10">
+<main class="stage">
+  <header>
+    <p class="eyebrow"><b>10</b> Proyecto final</p>
+    <h1 class="ch-title">triaje completo</h1>
+    <p class="ch-desc">Texto, JSON, imagen y una política, en una sola petición con cuatro preguntas. Tu código decide si actúa solo o escala a una persona.</p>
+  </header>
+
+  <section class="scene">
+    <div class="case">
+      <article class="card">
+        <header><span><i></i>mug-broken.jpg</span><span>input_image</span></header>
+        <div class="photo"><img src="assets/files/mug-broken.jpg" alt="Taza azul con el borde roto" /></div>
+      </article>
+      <div class="stack">
+        <article class="card">
+          <header><span><i></i>ticket</span><span>input_text</span></header>
+          <div class="body"><p class="msg">“<span data-edit="input">La taza llegó rota y es un regalo para el sábado. ¿Me mandáis otra?</span>”</p></div>
+        </article>
+        <article class="card">
+          <header><span><i></i>order</span><span>input_json</span></header>
+          <div class="data"><b>{</b> id: <em>4521</em>, product: <em>"Taza Pixel"</em>,
+  delivered: <em>"hace 2 días"</em>, charges: <b>[</b><em>12.9</em><b>]</b> <b>}</b></div>
+        </article>
+        <div class="files"><span>developer · return-policy.md</span></div>
+      </div>
+    </div>
+
+    <div class="grid-4">
+      <article class="card" id="w-damage" style="--c: var(--predicate)">
+        <header><span><i></i>damage</span></header>
+        <div class="body"><span class="tag">predicate</span><div class="meter" id="damage"><b class="val">—</b><div class="bar"><i></i></div></div></div>
+      </article>
+      <article class="card" id="w-deadline" style="--c: var(--predicate)">
+        <header><span><i></i>within_deadline</span></header>
+        <div class="body"><span class="tag">predicate</span><div class="meter" id="deadline"><b class="val">—</b><div class="bar"><i></i></div></div></div>
+      </article>
+      <article class="card" id="w-action" style="--c: var(--choice)">
+        <header><span><i></i>action</span></header>
+        <div class="body"><span class="tag">choice</span><b class="pick" id="action-choice" data-live>—</b><span class="small muted" id="action-conf" data-live>confidence —</span></div>
+      </article>
+      <article class="card" id="w-urgency" style="--c: var(--score)">
+        <header><span><i></i>urgency</span></header>
+        <div class="body"><span class="tag">score</span><div class="meter" id="urgency"><b class="val">—</b><div class="bar"><i></i></div></div></div>
+      </article>
+    </div>
+
+    <div class="action" id="action"><span id="action-text" data-live>—</span><small>console.log → tu decisión</small></div>
+  </section>
+</main>
+
+<aside class="panel" aria-label="Editor del ejercicio">
+  <p class="goal"><b>Reto</b><span>Junta todo: decide qué hacer con el ticket y actúa solo cuando esté claro.</span></p>
+  <p class="explain"><b>La API responde; tu código decide.</b> Decisions no ejecuta acciones: devuelve respuestas tipadas. Combínalas con umbrales y, si algo no está claro, escala a una persona.</p>
+</aside>
+
+<script type="text/plain" id="exercise" data-file="full-triage.js">
+import { readFile } from "node:fs/promises"
+import OpenAI from "openai"
+
+const client = new OpenAI()
+const policy = await readFile("return-policy.md", "utf8")
+const photo = (await readFile("mug-broken.jpg")).toString("base64")
+
+const ticket = "La taza llegó rota y es un regalo para el sábado. ¿Me mandáis otra?" //~ input
+const order = { id: 4521, product: "Taza Pixel", delivered: "hace 2 días", charges: [12.9] }
+
+const decision = await client.decisions.create({
+  model: "gpt-6-luna",
+  input: [
+    {
+      role: "developer", //__ la política, como contexto (solo texto)
+      content: `Answer using this store return policy:\n\n${policy}`,
+    },
+    {
+      role: "user",
+      content: [
+        { type: "input_text", text: ticket },
+        { type: "input_json", data: order }, //__ los datos del pedido, tal cual
+        { type: "input_image", image_url: `data:image/jpeg;base64,${photo}` }, //__ y la foto
+      ],
+    },
+  ],
+  questions: [
+    {
+      type: "predicate",
+      name: "damage",
+      instructions: "Is the product in the photo visibly damaged? Ignore shadows and packaging.",
+    },
+    {
+      type: "predicate",
+      name: "within_deadline",
+      instructions: "Was the damage reported within the policy deadline?",
+    },
+    {
+      type: "choice", //__ qué hacer, de una lista cerrada
+      name: "action",
+      instructions: "What should we do, per the policy and what the customer asks?",
+      choices: [
+        { value: "resend" },
+        { value: "refund" },
+        { value: "ask_for_photos" },
+        { value: "reject" },
+      ],
+    },
+    {
+      type: "score",
+      name: "urgency",
+      instructions: "How urgent is this for the customer?",
+      levels: [
+        { label: "Low", description: "No time pressure." },
+        { label: "Medium", description: "Wants it soon, no specific date." },
+        { label: "High", description: "Mentions a close date or deadline." },
+      ],
+    },
+  ],
+})
+
+const r = Object.fromEntries(decision.answers.map((a) => [a.name, a]))
+const isClear = r.damage.probability >= 0.9 && r.within_deadline.probability >= 0.9 //__ solo si las dos cosas están claras
+console.log(isClear ? `automático: ${r.action.choice}` : "revisión humana") //__ actúa o escala
+</script>
+<script>
+  window.renderStage = ({ calls, logs, status }) => {
+    const r = ui.answers(calls[0])
+    ui.meter('#damage', r.damage?.probability)
+    ui.meter('#deadline', r.within_deadline?.probability)
+    ui.text('#action-choice', r.action?.choice ?? '—')
+    ui.text('#action-conf', `confidence ${ui.fix(r.action?.confidence)}`)
+    ui.meter('#urgency', r.urgency?.score, 2)
+    ;['damage', 'deadline', 'action', 'urgency'].forEach((k, i) => ui.toggle(`#w-${k}`, 'is-on', [r.damage, r.within_deadline, r.action, r.urgency][i]))
+
+    const last = logs.at(-1)?.args?.join(' ')
+    ui.text('#action-text', last ?? (status === 'running' ? 'decidiendo…' : '—'))
+    ui.toggle('#action', 'auto', last?.startsWith('automático'))
+    ui.toggle('#action', 'human', last?.startsWith('revisión'))
+  }
+</script>
+<script type="application/json" id="mock">[{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"damage","probability":1},{"type":"predicate","name":"within_deadline","probability":1},{"type":"choice","name":"action","choice":"resend","probabilities":[{"value":"resend","probability":0.87},{"value":"refund","probability":0.01},{"value":"ask_for_photos","probability":0.12},{"value":"reject","probability":0}],"confidence":0.83},{"type":"score","name":"urgency","score":2,"probabilities":[{"value":0,"label":"Low","probability":0},{"value":1,"label":"Medium","probability":0},{"value":2,"label":"High","probability":1}],"confidence":1}],"usage":{"input_tokens":2616,"input_tokens_details":{"cached_tokens":2053,"cache_write_tokens":0,"cache_write_tokens_details":{"ttl_30m_tokens":0,"ttl_12h_tokens":0}},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":2616}}]</script>
+<script src="assets/highlight.js"></script>
+<script src="assets/stage.js"></script>
+<script src="assets/lesson.js"></script>
+</body>
+</html>

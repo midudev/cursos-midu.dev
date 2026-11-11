@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>05 · imágenes — Lecciones de la Decisions API</title>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-pixel/GeistPixelVF.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-mono/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="assets/lesson.css" />
+<style>
+  .photos { width: min(100%, 64vh); justify-self: center; }
+  .photo .chip .val { font: 400 22px/1 var(--pixel); }
+  /* una URL larga en la cabecera se corta con … */
+  .photos .card > header > span:first-child { min-width: 0; }
+  .photos .file { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+
+<body data-lesson="05">
+<main class="stage">
+  <header>
+    <p class="eyebrow"><b>05</b> Texto + imagen</p>
+    <h1 class="ch-title">input_image</h1>
+    <p class="ch-desc">Combina partes <code>input_text</code> e <code>input_image</code> en un mensaje de usuario. La imagen va como data URL en base64 o como URL pública.</p>
+  </header>
+
+  <section class="scene">
+    <p class="q"><span class="tag" style="--c: var(--predicate)">predicate</span><span>Is the product visibly damaged (cracked, chipped, or broken)? Ignore shadows and packaging.</span></p>
+    <div class="grid-2 photos">
+      <article class="card" id="c0" style="--c: var(--green)">
+        <header><span><i></i><span class="file" data-edit="photo0">mug-customer.jpg</span></span><span>#1</span></header>
+        <div class="photo">
+          <img src="assets/files/mug-customer.jpg" data-edit="photo0" data-edit-attr="src" data-edit-base="assets/files/" alt="Taza azul intacta sobre una mesa" />
+          <div class="chip"><span>damage</span><b class="val" data-live>—</b><span class="verdict" data-live>—</span></div>
+        </div>
+      </article>
+      <article class="card" id="c1" style="--c: var(--pink)">
+        <header><span><i></i><span class="file" data-edit="photo1">mug-broken.jpg</span></span><span>#2</span></header>
+        <div class="photo">
+          <img src="assets/files/mug-broken.jpg" data-edit="photo1" data-edit-attr="src" data-edit-base="assets/files/" alt="Taza azul con el borde roto" />
+          <div class="chip"><span>damage</span><b class="val" data-live>—</b><span class="verdict" data-live>—</span></div>
+        </div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<aside class="panel" aria-label="Editor del ejercicio">
+  <p class="goal"><b>Reto</b><span>Detecta si el producto de cada foto llegó dañado.</span></p>
+  <p class="explain"><b>Imágenes en el input.</b> Las imágenes solo van en mensajes <code>user</code> (o en la salida de una herramienta). Acepta data URLs en base64 o URLs <code>https</code> públicas; <code>file_id</code> no está soportado. Prueba a cambiar las fotos de la lista por URLs: van tal cual, sin base64.</p>
+</aside>
+
+<script type="text/plain" id="exercise" data-file="damage.js">
+import { readFile } from "node:fs/promises"
+import OpenAI from "openai"
+
+const client = new OpenAI()
+
+// Una URL pública va tal cual; un archivo local, como data URL en base64
+async function imageUrl(photo) {
+  if (photo.startsWith("http")) return photo
+  const base64 = (await readFile(photo)).toString("base64") //__ lee la foto en base64
+  return `data:image/jpeg;base64,${base64}` //__ y devuélvela como data URL
+}
+
+async function checkDamage(photo) {
+  const decision = await client.decisions.create({
+    model: "gpt-6-luna",
+    input: [
+      {
+        role: "user", //__ las imágenes van en un mensaje de usuario
+        content: [
+          { type: "input_text", text: "Photo of the product the customer received." },
+          {
+            type: "input_image", //__ una parte de tipo imagen
+            image_url: await imageUrl(photo),
+          },
+        ],
+      },
+    ],
+    questions: [
+      {
+        type: "predicate",
+        name: "damage",
+        instructions:
+          "Is the product visibly damaged (cracked, chipped, or broken)? " +
+          "Ignore shadows and packaging.",
+      },
+    ],
+  })
+  return decision.answers[0].probability
+}
+
+const photos = [
+  "mug-customer.jpg", //~ photo0
+  "mug-broken.jpg", //~ photo1
+]
+
+for (const photo of photos) {
+  console.log(photo, await checkDamage(photo))
+}
+</script>
+<script>
+  window.renderStage = ({ calls }) => {
+    ;[0, 1].forEach((i) => {
+      const a = calls[i]?.response?.answers?.[0]
+      const p = a?.probability
+      const card = ui.$(`#c${i}`)
+      ui.text(card.querySelector('.val'), ui.fix(p))
+      const v = card.querySelector('.verdict')
+      v.className = 'verdict' + (p == null ? '' : p >= 0.8 ? ' no' : p <= 0.2 ? ' yes' : ' mid')
+      v.textContent = p == null ? (calls[i]?.status === 'pending' ? 'mirando…' : '—') : p >= 0.8 ? 'dañada' : p <= 0.2 ? 'intacta' : 'dudosa'
+      card.classList.toggle('is-on', p != null)
+    })
+  }
+</script>
+<script type="application/json" id="mock">[{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"damage","probability":0}],"usage":{"input_tokens":752,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":752}},{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"damage","probability":1}],"usage":{"input_tokens":752,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":752}}]</script>
+<script src="assets/highlight.js"></script>
+<script src="assets/stage.js"></script>
+<script src="assets/lesson.js"></script>
+</body>
+</html>

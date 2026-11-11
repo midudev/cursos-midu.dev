@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>02 · score — Lecciones de la Decisions API</title>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-pixel/GeistPixelVF.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-mono/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="assets/lesson.css" />
+<style>
+  .scale { position: relative; margin: 28px 8px 34px; height: 2px; background: var(--line-2); }
+  .scale .tick { position: absolute; top: -6px; left: calc(var(--i) * 50%); width: 2px; height: 14px; background: var(--muted); translate: -50% 0; }
+  .scale .tick span { position: absolute; top: 20px; left: 50%; translate: -50% 0; color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .scale .tick:first-child span { translate: -8px 0; }
+  .scale .tick:nth-child(3) span { translate: calc(-100% + 8px) 0; }
+  .scale .tick b { position: absolute; bottom: 16px; left: 50%; translate: -50% 0; color: var(--faint); font: 400 12px/1 var(--pixel); }
+  .scale .pin {
+    position: absolute; top: -11px; left: calc(var(--s, 0) * 50%);
+    width: 24px; height: 24px; translate: -50% 0;
+    background: var(--score); opacity: 0;
+    transition: left .8s var(--ease), opacity .3s;
+  }
+  .scale .pin.has-value { opacity: 1; }
+  .formula { color: var(--muted); font-size: 13px; }
+  .formula b { color: var(--fg); font-weight: 400; }
+  .formula em { color: var(--score); font-style: normal; }
+  #dist { --c-pick: var(--score); }
+</style>
+</head>
+
+<body data-lesson="02">
+<main class="stage">
+  <header>
+    <p class="eyebrow"><b>02</b> Puntuar con una rúbrica</p>
+    <h1 class="ch-title">score</h1>
+    <p class="ch-desc">Un <code>score</code> evalúa el input contra niveles ordenados. Devuelve la media de los índices ponderada por su probabilidad, así que puede caer entre dos niveles.</p>
+  </header>
+
+  <section class="scene">
+    <article class="card">
+      <header><span><i></i>input</span><span>informe de error</span></header>
+      <div class="body"><p class="msg">“<span data-edit="input">El botón de exportar falla en Safari, pero en Chrome funciona.</span>”</p></div>
+    </article>
+
+    <article class="card" id="result" style="--c: var(--score)">
+      <header><span><i></i>questions[0] · severity</span><span class="tag">score</span></header>
+      <div class="body">
+        <div class="split">
+          <p class="msg">How severe is this bug?</p>
+          <div class="meter sm" id="meter"><b class="val">—</b></div>
+        </div>
+        <div class="scale">
+          <div class="tick" style="--i: 0"><b>0</b><span>Cosmetic</span></div>
+          <div class="tick" style="--i: 1"><b>1</b><span>Workaround</span></div>
+          <div class="tick" style="--i: 2"><b>2</b><span>Blocker</span></div>
+          <div class="pin" id="pin"></div>
+        </div>
+      </div>
+    </article>
+
+    <article class="card">
+      <header><span><i></i>answers[0].probabilities</span><span class="verdict" id="confidence" data-live>confidence —</span></header>
+      <div class="body stack">
+        <div class="rows" id="dist"></div>
+        <p class="formula" id="formula" data-live>score = Σ índice × probabilidad</p>
+      </div>
+    </article>
+  </section>
+</main>
+
+<aside class="panel" aria-label="Editor del ejercicio">
+  <p class="goal"><b>Reto</b><span>Puntúa la gravedad del error con una rúbrica de tres niveles.</span></p>
+  <p class="explain"><b>Los índices empiezan en 0.</b> Ordena los <code>levels</code> de menor a mayor (entre 2 y 10) y describe cada uno con criterios observables. Si necesitas una categoría sin orden, usa <code>choice</code>.</p>
+</aside>
+
+<script type="text/plain" id="exercise" data-file="severity.js">
+import OpenAI from "openai"
+
+const client = new OpenAI()
+
+const decision = await client.decisions.create({
+  model: "gpt-6-luna",
+  input: "El botón de exportar falla en Safari, pero en Chrome funciona.", //~ input
+  questions: [
+    {
+      type: "score", //__ una escala ordenada
+      name: "severity",
+      instructions: "How severe is this bug?",
+      levels: [ //__ de 2 a 10 niveles, de menor a mayor
+        { label: "Cosmetic", description: "Only the look is affected." },
+        { label: "Workaround", description: "Something fails, but there is a workaround." },
+        { label: "Blocker", description: "Something fails with no workaround." }, //__ el nivel más alto (índice 2)
+      ],
+    },
+  ],
+})
+
+const [answer] = decision.answers
+console.log(answer.score) //__ la media ponderada de los índices
+console.log(answer.probabilities)
+</script>
+<script>
+  const LEVELS = [{ value: 0, label: 'Cosmetic' }, { value: 1, label: 'Workaround' }, { value: 2, label: 'Blocker' }]
+  window.renderStage = ({ calls }) => {
+    const a = ui.answers(calls[0]).severity
+    const s = a?.score
+    ui.meter('#meter', s, 2)
+    const pin = ui.$('#pin')
+    pin.style.setProperty('--s', s ?? 0)
+    pin.classList.toggle('has-value', s != null)
+    const top = a?.probabilities?.reduce((m, p) => (p.probability > m.probability ? p : m))
+    ui.dist('#dist', LEVELS, a, { picked: top ? String(top.value) : null })
+    ui.text('#confidence', `confidence ${ui.fix(a?.confidence)}`)
+    ui.$('#formula').innerHTML = a?.probabilities
+      ? a.probabilities.map((p) => `${p.value} × <b>${ui.fix(p.probability)}</b>`).join(' + ') + ` = <em>${ui.fix(s)}</em>`
+      : 'score = Σ índice × probabilidad'
+  }
+</script>
+<script type="application/json" id="mock">[{"model":"gpt-6-luna","answers":[{"type":"score","name":"severity","score":1,"probabilities":[{"value":0,"label":"Cosmetic","probability":0.03},{"value":1,"label":"Workaround","probability":0.94},{"value":2,"label":"Blocker","probability":0.03}],"confidence":0.91}],"usage":{"input_tokens":148,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":148}}]</script>
+<script src="assets/highlight.js"></script>
+<script src="assets/stage.js"></script>
+<script src="assets/lesson.js"></script>
+</body>
+</html>

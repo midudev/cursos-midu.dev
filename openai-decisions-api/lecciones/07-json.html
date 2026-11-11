@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>07 · json — Lecciones de la Decisions API</title>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-pixel/GeistPixelVF.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-mono/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="assets/lesson.css" />
+<style>
+  .order .meter { padding: 14px; border-top: 1px solid var(--line); }
+  .order .meter .val { font-size: clamp(32px, 3.2vw, 56px); }
+</style>
+</head>
+
+<body data-lesson="07">
+<main class="stage">
+  <header>
+    <p class="eyebrow"><b>07</b> Datos estructurados</p>
+    <h1 class="ch-title">input_json</h1>
+    <p class="ch-desc">Pasa objetos y arrays tal cual con una parte <code>input_json</code>, sin convertirlos antes a texto. Solo en mensajes <code>user</code>.</p>
+  </header>
+
+  <section class="scene">
+    <article class="card">
+      <header><span><i></i>ticket</span><span>input_json · data.ticket</span></header>
+      <div class="data"><b>{</b> subject: <em>"Cobro duplicado"</em>, message: <em>"Me habéis cobrado dos veces el pedido."</em> <b>}</b></div>
+    </article>
+
+    <div class="grid-2">
+      <article class="card order" id="o0" style="--c: var(--predicate)">
+        <header><span><i></i>pedido 4521</span><span>data.order</span></header>
+<div class="data"><b>{</b>
+  id: <em>4521</em>,
+  total: <em>49</em>,
+  charges: <b>[</b><em>49</em>, <em>49</em><b>]</b>
+<b>}</b></div>
+        <div class="meter sm"><b class="val">—</b><div class="bar"><i></i></div><span class="verdict" data-live>duplicate_charge</span></div>
+      </article>
+      <article class="card order" id="o1" style="--c: var(--predicate)">
+        <header><span><i></i>pedido 4522</span><span>data.order</span></header>
+<div class="data"><b>{</b>
+  id: <em>4522</em>,
+  total: <em>49</em>,
+  charges: <b>[</b><em>49</em><b>]</b>
+<b>}</b></div>
+        <div class="meter sm"><b class="val">—</b><div class="bar"><i></i></div><span class="verdict" data-live>duplicate_charge</span></div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<aside class="panel" aria-label="Editor del ejercicio">
+  <p class="goal"><b>Reto</b><span>Comprueba el mismo ticket contra dos pedidos: ¿los datos confirman el cobro duplicado?</span></p>
+  <p class="explain"><b>JSON como evidencia.</b> Las claves dentro de <code>data</code> son datos normales: un <code>"role"</code> o un <code>"image_url"</code> ahí dentro no crean mensajes ni descargan imágenes. El formato de la respuesta no cambia.</p>
+</aside>
+
+<script type="text/plain" id="exercise" data-file="duplicate-charge.js">
+import OpenAI from "openai"
+
+const client = new OpenAI()
+
+const ticket = {
+  subject: "Cobro duplicado",
+  message: "Me habéis cobrado dos veces el pedido.",
+}
+const orders = [
+  { id: 4521, total: 49, charges: [49, 49] },
+  { id: 4522, total: 49, charges: [49] },
+]
+
+async function checkDuplicateCharge(order) {
+  const decision = await client.decisions.create({
+    model: "gpt-6-luna",
+    input: [
+      {
+        role: "user", //__ input_json solo se admite en mensajes user
+        content: [
+          { type: "input_text", text: "Check the ticket against the order data." },
+          {
+            type: "input_json", //__ datos estructurados, sin JSON.stringify
+            data: { ticket, order }, //__ el objeto va en data
+          },
+        ],
+      },
+    ],
+    questions: [
+      {
+        type: "predicate",
+        name: "duplicate_charge",
+        instructions:
+          "Does the order data confirm the duplicate charge in the ticket? " +
+          "Yes: the order was charged more than its total.",
+      },
+    ],
+  })
+  return decision.answers[0].probability
+}
+
+for (const order of orders) {
+  console.log(order.id, await checkDuplicateCharge(order)) //__ evalúa cada pedido
+}
+</script>
+<script>
+  window.renderStage = ({ calls }) => {
+    ;[0, 1].forEach((i) => {
+      const p = calls[i]?.response?.answers?.[0]?.probability
+      const card = ui.$(`#o${i}`)
+      ui.meter(card.querySelector('.meter'), p)
+      const v = card.querySelector('.verdict')
+      v.className = 'verdict' + (p == null ? '' : p >= 0.8 ? ' yes' : p <= 0.2 ? ' no' : ' mid')
+      v.textContent = p == null ? 'duplicate_charge' : p >= 0.8 ? '✓ confirmado: reembolsar' : p <= 0.2 ? '✗ los datos no lo confirman' : '~ revisar a mano'
+      card.classList.toggle('is-on', p != null)
+    })
+  }
+</script>
+<script type="application/json" id="mock">[{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"duplicate_charge","probability":1}],"usage":{"input_tokens":220,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":220}},{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"duplicate_charge","probability":0}],"usage":{"input_tokens":218,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":218}}]</script>
+<script src="assets/highlight.js"></script>
+<script src="assets/stage.js"></script>
+<script src="assets/lesson.js"></script>
+</body>
+</html>

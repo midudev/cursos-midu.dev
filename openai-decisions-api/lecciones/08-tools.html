@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>08 · conversaciones y herramientas — Lecciones de la Decisions API</title>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-pixel/GeistPixelVF.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-mono/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="assets/lesson.css" />
+<style>
+  .chat { display: grid; gap: 8px; padding: 14px; background: var(--dots); }
+  .item { display: grid; grid-template-columns: 20ch 1fr; gap: 12px; align-items: baseline; font-size: 13px; }
+  .item > span:first-child { color: var(--faint); font-size: 12px; text-align: right; }
+  .item p { padding: 8px 12px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--bg); text-wrap: pretty; }
+  .item.dev p { color: var(--muted); border-style: dashed; }
+  .item.tool p { color: var(--amber); font-size: 12px; }
+  .item.tool p code { color: var(--muted); }
+  .item mark { padding-inline: 2px; border-radius: 3px; background: transparent; color: inherit; transition: background-color .4s, color .4s; }
+  .is-checked .item mark.bad { background: color-mix(in oklab, var(--pink) 30%, transparent); color: #fff; }
+  .is-checked .item mark.good { background: color-mix(in oklab, var(--green) 30%, transparent); color: #fff; }
+  #next { --c-pick: var(--choice); }
+</style>
+</head>
+
+<body data-lesson="08">
+<main class="stage">
+  <header>
+    <p class="eyebrow"><b>08</b> Conversaciones con herramientas</p>
+    <h1 class="ch-title">tool calls</h1>
+    <p class="ch-desc">El <code>input</code> puede ser una conversación entera: mensajes, llamadas a funciones y sus salidas, enlazadas por <code>call_id</code>. Perfecto para evaluar a tu agente.</p>
+  </header>
+
+  <section class="scene">
+    <article class="card" id="chat">
+      <header><span><i></i>input · conversation</span><span>5 items</span></header>
+      <div class="chat">
+        <div class="item dev"><span>developer</span><p>You are the store's customer support assistant.</p></div>
+        <div class="item"><span>user</span><p>¿Cuándo llega mi pedido 4521? Lo necesito el viernes.</p></div>
+        <div class="item tool"><span>function_call</span><p>get_order(<code>{"id":4521}</code>) · call_1</p></div>
+        <div class="item tool"><span>function_call_output</span><p>call_1 → {"status":"out_for_delivery","delivery_day":"<mark class="good">sábado</mark>"}</p></div>
+        <div class="item"><span>assistant</span><p>¡Buenas noticias! Llega el <mark class="bad">jueves</mark>, antes del viernes.</p></div>
+      </div>
+    </article>
+
+    <div class="grid-2">
+      <article class="card" id="w-resp" style="--c: var(--predicate)">
+        <header><span><i></i>grounded</span><span class="tag">predicate</span></header>
+        <div class="body stack">
+          <p class="q muted">Is every fact in the assistant&rsquo;s last reply supported by the tool output?</p>
+          <div class="meter sm" id="grounded"><b class="val">—</b><div class="bar"><i></i></div></div>
+        </div>
+      </article>
+      <article class="card" id="w-next" style="--c: var(--choice)">
+        <header><span><i></i>next_step</span><span class="tag">choice</span></header>
+        <div class="body stack">
+          <p class="q muted">What should happen next?</p>
+          <div class="rows" id="next"></div>
+        </div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<aside class="panel" aria-label="Editor del ejercicio">
+  <p class="goal"><b>Reto</b><span>Comprueba si tu agente de soporte se ha inventado la fecha de entrega.</span></p>
+  <p class="explain"><b>Las herramientas son evidencia.</b> Decisions no ejecuta nada: lee la conversación y responde. Cada <code>function_call_output</code> se enlaza con su llamada por <code>call_id</code>. Ficheros, audio y referencias a items no están soportados.</p>
+</aside>
+
+<script type="text/plain" id="exercise" data-file="evaluate.js">
+import OpenAI from "openai"
+
+const client = new OpenAI()
+
+// La conversación que generó agent.js
+const conversation = [
+  { role: "developer", content: "You are the store's customer support assistant." },
+  { role: "user", content: "¿Cuándo llega mi pedido 4521? Lo necesito el viernes." },
+  {
+    type: "function_call", //__ el agente llamó a una herramienta
+    call_id: "call_1",
+    name: "get_order",
+    arguments: '{"id":4521}',
+  },
+  {
+    type: "function_call_output", //__ y esto es lo que devolvió
+    call_id: "call_1", //__ enlaza la salida con su llamada
+    output: '{"status":"out_for_delivery","delivery_day":"sábado"}',
+  },
+  { role: "assistant", content: "¡Buenas noticias! Llega el jueves, antes del viernes." },
+]
+
+const decision = await client.decisions.create({
+  model: "gpt-6-luna",
+  input: conversation, //__ toda la conversación como input
+  questions: [
+    {
+      type: "predicate",
+      name: "grounded",
+      instructions: "Is every fact in the assistant's last reply supported by the tool output?",
+    },
+    {
+      type: "choice",
+      name: "next_step",
+      instructions: "What should happen next?",
+      choices: [
+        { value: "close", description: "The customer got a correct, complete answer." },
+        { value: "escalate", description: "A human must step in to fix or handle the case." },
+        { value: "ask_for_info", description: "The customer must provide more details." },
+      ],
+    },
+  ],
+})
+
+for (const answer of decision.answers) console.log(answer)
+</script>
+<script type="text/plain" data-file="agent.js">
+// El agente de soporte que generó la conversación
+import OpenAI from "openai"
+import { db } from "./db.js"
+
+const client = new OpenAI()
+
+// 1. Le describimos la herramienta al modelo
+const tools = [
+  {
+    type: "function",
+    name: "get_order",
+    description: "Get order status and delivery day.",
+    parameters: {
+      type: "object",
+      properties: { id: { type: "number" } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+]
+
+// 2. La implementamos: el modelo solo la pide
+async function get_order({ id }) {
+  return db.orders.find(id) // delivery_day: "sábado"
+}
+
+const conversation = [
+  { role: "developer", content: "You are the store's customer support assistant." },
+  { role: "user", content: "¿Cuándo llega mi pedido 4521? Lo necesito el viernes." },
+]
+
+// 3. El modelo pide get_order → item function_call
+let response = await client.responses.create({
+  model: "gpt-6-luna",
+  input: conversation,
+  tools,
+})
+
+for (const item of response.output) {
+  if (item.type !== "function_call") continue
+  conversation.push(item)
+
+  // 4. La ejecutamos → item function_call_output
+  const args = JSON.parse(item.arguments)
+  const result = await get_order(args)
+  conversation.push({
+    type: "function_call_output",
+    call_id: item.call_id,
+    output: JSON.stringify(result),
+  })
+}
+
+// 5. Responde al cliente… y se inventa el jueves
+response = await client.responses.create({
+  model: "gpt-6-luna",
+  input: conversation,
+  tools,
+})
+const reply = response.output_text
+conversation.push({ role: "assistant", content: reply })
+
+// conversation → es el input de evaluate.js
+</script>
+<script>
+  window.renderStage = ({ calls }) => {
+    const r = ui.answers(calls[0])
+    ui.meter('#grounded', r.grounded?.probability)
+    ui.dist('#next', [{ value: 'close' }, { value: 'escalate' }, { value: 'ask_for_info' }], r.next_step)
+    ui.toggle('#chat', 'is-checked', r.grounded)
+    ui.toggle('#w-resp', 'is-on', r.grounded)
+    ui.toggle('#w-next', 'is-on', r.next_step)
+  }
+</script>
+<script type="application/json" id="mock">[{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"grounded","probability":0},{"type":"choice","name":"next_step","choice":"escalate","probabilities":[{"value":"close","probability":0.04},{"value":"escalate","probability":0.95},{"value":"ask_for_info","probability":0.01}],"confidence":0.93}],"usage":{"input_tokens":387,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":387}}]</script>
+<script src="assets/highlight.js"></script>
+<script src="assets/stage.js"></script>
+<script src="assets/lesson.js"></script>
+</body>
+</html>

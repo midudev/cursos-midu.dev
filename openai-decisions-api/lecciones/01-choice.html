@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>01 · choice — Lecciones de la Decisions API</title>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-pixel/GeistPixelVF.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-mono/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="assets/lesson.css" />
+<style>
+  .inbox { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .inbox .card { --c: var(--choice); }
+  .inbox .card > header span:last-child { color: var(--faint); }
+  .inbox .meter .val { font-size: clamp(28px, 2.6vw, 44px); color: var(--muted); }
+  .inbox .meter .bar i { background: var(--faint); }
+  .inbox .card.is-on .val { color: var(--c); }
+  .inbox .card.is-on .bar i { background: var(--c); }
+  .inbox .card.is-on > header span:last-child { color: var(--c); }
+  .inbox small { display: block; margin-top: 8px; color: var(--faint); font-size: 11px; line-height: 1.4; text-wrap: pretty; }
+</style>
+</head>
+
+<body data-lesson="01">
+<main class="stage">
+  <header>
+    <p class="eyebrow"><b>01</b> Elegir de una lista</p>
+    <h1 class="ch-title">choice</h1>
+    <p class="ch-desc">Un <code>choice</code> elige un único valor de las opciones que tú defines y devuelve la probabilidad de cada una, además de su <code>confidence</code>.</p>
+  </header>
+
+  <section class="scene">
+    <article class="card">
+      <header><span><i></i>input</span><span>mensaje de soporte</span></header>
+      <div class="body"><p class="msg">“<span data-edit="input">Llevo una semana esperando el paquete y el seguimiento no se mueve.</span>”</p></div>
+    </article>
+
+    <article class="card" style="--c: var(--choice)">
+      <header><span><i></i>questions[0] · department</span><span class="tag">choice</span></header>
+      <div class="body"><p class="msg">Which team should handle this message?</p></div>
+    </article>
+
+    <div class="inbox">
+      <article class="card" data-value="billing">
+        <header><span><i></i>billing</span><span>bandeja</span></header>
+        <div class="body meter"><b class="val">—</b><div class="bar"><i></i></div><small>Payments, invoices, and refunds.</small></div>
+      </article>
+      <article class="card" data-value="technical">
+        <header><span><i></i>technical</span><span>bandeja</span></header>
+        <div class="body meter"><b class="val">—</b><div class="bar"><i></i></div><small>Problems using the website or app.</small></div>
+      </article>
+      <article class="card" data-value="shipping">
+        <header><span><i></i>shipping</span><span>bandeja</span></header>
+        <div class="body meter"><b class="val">—</b><div class="bar"><i></i></div><small>Deliveries and package tracking.</small></div>
+      </article>
+      <article class="card" data-value="other">
+        <header><span><i></i>other</span><span>bandeja</span></header>
+        <div class="body meter"><b class="val">—</b><div class="bar"><i></i></div><small>None of the above.</small></div>
+      </article>
+    </div>
+
+    <div class="split">
+      <span class="muted small">answers[0].choice → <b id="choice" class="tag" style="--c: var(--choice)" data-live>—</b></span>
+      <span class="verdict" id="confidence" data-live>confidence —</span>
+    </div>
+  </section>
+</main>
+
+<aside class="panel" aria-label="Editor del ejercicio">
+  <p class="goal"><b>Reto</b><span>Envía el mensaje a la bandeja correcta con una pregunta <code>choice</code>.</span></p>
+  <p class="explain"><b>Opciones con nombre y descripción.</b> <code>value</code> es lo que te devuelve la API; <code>description</code> explica cuándo aplica. Añade siempre una opción de escape como <code>"other"</code> para lo que no encaje en ninguna.</p>
+</aside>
+
+<script type="text/plain" id="exercise" data-file="route.js">
+import OpenAI from "openai"
+
+const client = new OpenAI()
+
+const decision = await client.decisions.create({
+  model: "gpt-6-luna",
+  input: "Llevo una semana esperando el paquete y el seguimiento no se mueve.", //~ input
+  questions: [
+    {
+      type: "choice", //__ elige una opción de una lista cerrada
+      name: "department",
+      instructions: "Which team should handle this message?",
+      choices: [ //__ la lista de opciones
+        { value: "billing", description: "Payments, invoices, and refunds." },
+        { value: "technical", description: "Problems using the website or app." },
+        { value: "shipping", description: "Deliveries and package tracking." },
+        { value: "other", description: "None of the above." }, //__ una opción de escape
+      ],
+    },
+  ],
+})
+
+const [answer] = decision.answers
+console.log(answer.choice) //__ el valor elegido
+console.log(answer.confidence) //__ y la confianza en esa elección
+</script>
+<script>
+  window.renderStage = ({ calls }) => {
+    const a = ui.answers(calls[0]).department
+    const probs = new Map((a?.probabilities ?? []).map((p) => [String(p.value), p.probability]))
+    ui.$$('.inbox .card').forEach((card) => {
+      ui.meter(card.querySelector('.meter'), probs.get(card.dataset.value))
+      card.classList.toggle('is-on', a?.choice === card.dataset.value)
+    })
+    ui.text('#choice', a?.choice ?? '—')
+    ui.text('#confidence', `confidence ${ui.fix(a?.confidence)}`)
+    ui.toggle('#confidence', 'yes', a?.confidence >= 0.8)
+    ui.toggle('#confidence', 'mid', a?.confidence < 0.8)
+  }
+</script>
+<script type="application/json" id="mock">[{"model":"gpt-6-luna","answers":[{"type":"choice","name":"department","choice":"shipping","probabilities":[{"value":"billing","probability":0},{"value":"technical","probability":0},{"value":"shipping","probability":1},{"value":"other","probability":0}],"confidence":1}],"usage":{"input_tokens":156,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":156}}]</script>
+<script src="assets/highlight.js"></script>
+<script src="assets/stage.js"></script>
+<script src="assets/lesson.js"></script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>06 · imágenes en las preguntas — Lecciones de la Decisions API</title>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-pixel/GeistPixelVF.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-mono/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="assets/lesson.css" />
+<style>
+  .ref { display: grid; grid-template-columns: minmax(0, 30%) 1fr; gap: 18px; align-items: center; }
+  .ref .card .photo { background: #fff; }
+  .ref p { color: var(--muted); font-size: 13px; text-wrap: pretty; }
+  .ref p b { color: var(--fg); font-weight: 500; }
+  .photo .chip .val { font: 400 20px/1 var(--pixel); }
+  .flow { color: var(--faint); font-size: 12px; text-align: center; }
+</style>
+</head>
+
+<body data-lesson="06">
+<main class="stage">
+  <header>
+    <p class="eyebrow"><b>06</b> Imágenes en las preguntas</p>
+    <h1 class="ch-title">referencia</h1>
+    <p class="ch-desc">Lo compartido va en <code>input</code>. Lo que cambia en cada pregunta, en sus <code>instructions</code>: un array de partes de texto e imagen.</p>
+  </header>
+
+  <section class="scene">
+    <div class="ref">
+      <article class="card">
+        <header><span><i></i>A · mug-catalog.jpg</span></header>
+        <div class="photo"><img src="assets/files/mug-catalog.jpg" alt="Foto de catálogo de la taza azul" /></div>
+      </article>
+      <p><b>Devoluciones.</b> El cliente manda una foto del producto que devuelve. ¿Es el mismo modelo que vendimos? La foto de catálogo (A) es la evidencia compartida; cada foto B va en su propia pregunta.</p>
+    </div>
+    <p class="flow"><span class="tag" style="--c: var(--predicate)">predicate</span> × 3 · questions[i].instructions = [ texto, imagen B ]</p>
+    <div class="grid-3" id="cands">
+      <article class="card" data-name="mug-customer.jpg">
+        <header><span><i></i>B · mug-customer.jpg</span></header>
+        <div class="photo"><img src="assets/files/mug-customer.jpg" alt="La misma taza en una mesa" /><div class="chip"><b class="val" data-live>—</b><span class="verdict" data-live>—</span></div></div>
+      </article>
+      <article class="card" data-name="mug-broken.jpg">
+        <header><span><i></i>B · mug-broken.jpg</span></header>
+        <div class="photo"><img src="assets/files/mug-broken.jpg" alt="La misma taza, rota" /><div class="chip"><b class="val" data-live>—</b><span class="verdict" data-live>—</span></div></div>
+      </article>
+      <article class="card" data-name="mug-other.jpg">
+        <header><span><i></i>B · mug-other.jpg</span></header>
+        <div class="photo"><img src="assets/files/mug-other.jpg" alt="Otra taza roja con lunares" /><div class="chip"><b class="val" data-live>—</b><span class="verdict" data-live>—</span></div></div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<aside class="panel" aria-label="Editor del ejercicio">
+  <p class="goal"><b>Reto</b><span>Compara tres fotos de clientes con la foto de catálogo en una sola petición.</span></p>
+  <p class="explain"><b>Una pregunta por candidata.</b> Pon las partes directamente en <code>instructions</code>, sin <code>role</code> ni mensaje. Funciona igual con <code>predicate</code>, <code>choice</code> y <code>score</code>, y las imágenes de las preguntas cuentan para los límites de imágenes de la petición.</p>
+</aside>
+
+<script type="text/plain" id="exercise" data-file="returns.js">
+import { readFile } from "node:fs/promises"
+import OpenAI from "openai"
+
+const client = new OpenAI()
+const dataURL = async (file) =>
+  `data:image/jpeg;base64,${(await readFile(file)).toString("base64")}`
+
+const candidates = ["mug-customer.jpg", "mug-broken.jpg", "mug-other.jpg"]
+
+const decision = await client.decisions.create({
+  model: "gpt-6-luna",
+  input: [
+    {
+      role: "user",
+      content: [
+        { type: "input_text", text: "Image A: catalog photo of the product we sold." },
+        { type: "input_image", image_url: await dataURL("mug-catalog.jpg") }, //__ la referencia, compartida
+      ],
+    },
+  ],
+  questions: await Promise.all( //__ una pregunta por cada foto candidata
+    candidates.map(async (file) => ({
+      type: "predicate",
+      name: file,
+      instructions: [ //__ las instrucciones ahora son un array de partes
+        {
+          type: "input_text",
+          text: "Is the mug in image B the same model as in image A? " +
+            "Ignore damage, lighting, and background.",
+        },
+        { type: "input_image", image_url: await dataURL(file) }, //__ la imagen B de esta pregunta
+      ],
+    }))
+  ),
+})
+
+for (const answer of decision.answers) {
+  console.log(answer.name, answer.probability)
+}
+</script>
+<script>
+  window.renderStage = ({ calls }) => {
+    const r = ui.answers(calls[0])
+    ui.$$('#cands .card').forEach((card) => {
+      const p = r[card.dataset.name]?.probability
+      ui.text(card.querySelector('.val'), ui.fix(p))
+      const v = card.querySelector('.verdict')
+      v.className = 'verdict' + (p == null ? '' : p >= 0.8 ? ' yes' : p <= 0.2 ? ' no' : ' mid')
+      v.textContent = p == null ? '—' : p >= 0.8 ? '✓ mismo modelo' : p <= 0.2 ? '✗ otro producto' : '~ dudosa'
+      card.style.setProperty('--c', p == null ? 'var(--fg)' : p >= 0.8 ? 'var(--green)' : p <= 0.2 ? 'var(--pink)' : 'var(--amber)')
+      card.classList.toggle('is-on', p != null)
+    })
+  }
+</script>
+<script type="application/json" id="mock">[{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"mug-customer.jpg","probability":0.98},{"type":"predicate","name":"mug-broken.jpg","probability":0.93},{"type":"predicate","name":"mug-other.jpg","probability":0}],"usage":{"input_tokens":2824,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":2824}}]</script>
+<script src="assets/highlight.js"></script>
+<script src="assets/stage.js"></script>
+<script src="assets/lesson.js"></script>
+</body>
+</html>

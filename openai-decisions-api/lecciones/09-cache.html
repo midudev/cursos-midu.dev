@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>09 · prompt caching — Lecciones de la Decisions API</title>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-pixel/GeistPixelVF.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-mono/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="assets/lesson.css" />
+<style>
+  .layout { display: flex; align-items: stretch; height: 44px; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; font-size: 12px; }
+  .layout > span { display: flex; align-items: center; padding-inline: 12px; }
+  .layout .pol { flex: 1; background: var(--dots); color: var(--fg); }
+  .layout .bp { flex: none; padding: 0 8px; background: color-mix(in oklab, var(--green) 18%, transparent); color: var(--green); border-inline: 2px dashed var(--green); }
+  .layout .tk { flex: 0 0 26%; color: var(--muted); }
+  .layout .qs { flex: 0 0 16%; color: var(--blue); border-left: 1px solid var(--line-2); }
+  .runs { display: grid; gap: 10px; }
+  .run .body { display: grid; gap: 10px; }
+  .run .top { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+  .stackbar { display: flex; height: 22px; padding: 2px; gap: 2px; border: 1px solid var(--line-2); border-radius: 4px; }
+  .stackbar i { display: block; height: 100%; width: calc(var(--w, 0) * 100%); mask: repeating-linear-gradient(90deg, #000 0 6px, transparent 6px 8px); transition: width .7s var(--ease); }
+  .stackbar .hit { background: var(--green); }
+  .stackbar .write { background: var(--amber); }
+  .stackbar .rest { background: var(--faint); }
+  .nums { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 12px; }
+  .nums b { font-weight: 400; color: var(--fg); }
+  .nums .h b { color: var(--green); }
+  .nums .w b { color: var(--amber); }
+</style>
+</head>
+
+<body data-lesson="09">
+<main class="stage">
+  <header>
+    <p class="eyebrow"><b>09</b> Reutilizar el input</p>
+    <h1 class="ch-title">prompt caching</h1>
+    <p class="ch-desc">Si muchas peticiones comparten el mismo comienzo (una política, un documento, una imagen), la caché lo reutiliza y lo cobra más barato. Mínimo 1.024 tokens de prefijo.</p>
+  </header>
+
+  <section class="scene">
+    <div class="stack">
+      <span class="muted small">input de cada petición</span>
+      <div class="layout">
+        <span class="pol">return-policy.md · ~1.400 tokens</span>
+        <span class="bp">breakpoint</span>
+        <span class="tk">ticket (cambia)</span>
+        <span class="qs">questions</span>
+      </div>
+    </div>
+
+    <div class="runs" id="runs"></div>
+
+    <div class="nums">
+      <span class="h"><b>■</b> cached_tokens · leídos de caché</span>
+      <span class="w"><b>■</b> cache_write_tokens · escritos en caché</span>
+      <span><b>■</b> resto del input</span>
+    </div>
+  </section>
+</main>
+
+<aside class="panel" aria-label="Editor del ejercicio">
+  <p class="goal"><b>Reto</b><span>Evalúa dos tickets con la misma política y consigue que el segundo la lea de caché.</span></p>
+  <p class="explain"><b>Implícito por defecto.</b> Decisions pone un breakpoint al final del <code>input</code>. Aquí el ticket cambia en cada petición, así que marcamos el final de la política con <code>prompt_cache_breakpoint</code>. Las <code>questions</code> nunca forman parte del prefijo cacheado.</p>
+</aside>
+
+<script type="text/plain" id="exercise" data-file="cache.js">
+import { readFile } from "node:fs/promises"
+import OpenAI from "openai"
+
+const client = new OpenAI()
+const policy = await readFile("return-policy.md", "utf8")
+
+const tickets = [
+  "Mi taza llegó rota hace 20 días. ¿Me la cambiáis?",
+  "Quiero devolver una camiseta que ya he usado.",
+]
+
+for (const ticket of tickets) {
+  const decision = await client.decisions.create({
+    model: "gpt-6-luna",
+    prompt_cache_key: "return-policy", //__ agrupa las peticiones que comparten caché
+    input: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: policy,
+            prompt_cache_breakpoint: { mode: "explicit" }, //__ aquí termina el prefijo reutilizable
+          },
+          { type: "input_text", text: `Ticket: ${ticket}` },
+        ],
+      },
+    ],
+    questions: [
+      {
+        type: "predicate",
+        name: "eligible",
+        instructions: "Does the policy allow a return or exchange for this ticket?",
+      },
+    ],
+  })
+
+  const { input_tokens, input_tokens_details } = decision.usage //__ el consumo viene en usage
+  console.log(input_tokens, input_tokens_details.cached_tokens) //__ total y tokens leídos de caché
+}
+</script>
+<script>
+  const TICKETS = ['Mi taza llegó rota hace 20 días. ¿Me la cambiáis?', 'Quiero devolver una camiseta que ya he usado.']
+  window.renderStage = ({ calls }) => {
+    const max = Math.max(1, ...calls.map((c) => c.response?.usage?.input_tokens ?? 0))
+    ui.$('#runs').innerHTML = TICKETS.map((t, i) => {
+      const c = calls[i]
+      const u = c?.response?.usage
+      const total = u?.input_tokens ?? 0
+      const hit = u?.input_tokens_details?.cached_tokens ?? 0
+      const write = u?.input_tokens_details?.cache_write_tokens ?? 0
+      const rest = Math.max(0, total - hit - write)
+      const p = c?.response?.answers?.[0]?.probability
+      return `
+        <article class="card run${u ? ' is-on' : ''}" style="--c: ${hit ? 'var(--green)' : 'var(--amber)'}">
+          <header><span><i></i>petición #${i + 1}</span><span>eligible: <b data-live>${ui.fix(p)}</b></span></header>
+          <div class="body">
+            <div class="top"><span>${ui.esc(t)}</span></div>
+            <div class="stackbar">
+              <i class="hit" style="--w:${hit / max}"></i><i class="write" style="--w:${write / max}"></i><i class="rest" style="--w:${rest / max}"></i>
+            </div>
+            <div class="nums">
+              <span>input_tokens <b data-live>${u ? total.toLocaleString('es') : '—'}</b></span>
+              <span class="h">cached_tokens <b data-live>${u ? hit.toLocaleString('es') : '—'}</b></span>
+              <span class="w">cache_write_tokens <b data-live>${u ? write.toLocaleString('es') : '—'}</b></span>
+            </div>
+          </div>
+        </article>`
+    }).join('')
+  }
+</script>
+<script type="application/json" id="mock">[{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"eligible","probability":0.73}],"usage":{"input_tokens":1594,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":1437,"cache_write_tokens_details":{"ttl_30m_tokens":1437,"ttl_12h_tokens":0}},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":1594}},{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"eligible","probability":0}],"usage":{"input_tokens":1589,"input_tokens_details":{"cached_tokens":1420,"cache_write_tokens":12,"cache_write_tokens_details":{"ttl_30m_tokens":12,"ttl_12h_tokens":0}},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":1589}}]</script>
+<script src="assets/highlight.js"></script>
+<script src="assets/stage.js"></script>
+<script src="assets/lesson.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "decisions-api-lecciones",
+  "private": true,
+  "type": "module",
+  "description": "Curso en lecciones interactivas sobre la OpenAI Decisions API",
+  "scripts": {
+    "start": "node server.js",
+    "comprobar": "node scripts/comprobar.mjs"
+  },
+  "engines": {
+    "node": ">=21.7"
+  }
+}

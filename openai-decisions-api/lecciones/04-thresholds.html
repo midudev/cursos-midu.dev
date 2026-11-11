@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>04 · umbrales — Lecciones de la Decisions API</title>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-pixel/GeistPixelVF.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-mono/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="assets/lesson.css" />
+<style>
+  .reviews { display: grid; gap: 10px; }
+  .review { display: grid; grid-template-columns: 3ch minmax(0, 1fr) 30% 4.5ch 10ch; align-items: center; gap: 14px; padding: 12px 14px; }
+  .review > b { color: var(--faint); font: 400 13px/1 var(--pixel); }
+  .review p { font-size: 13px; text-wrap: pretty; }
+  .review .bar { --c: var(--faint); height: 14px; }
+  .review .v { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; }
+  .review .verdict { justify-content: center; }
+  .review.hide .bar { --c: var(--pink); }
+  .review.review .bar { --c: var(--amber); }
+  .review.publish .bar { --c: var(--green); }
+  .zones { display: grid; grid-template-columns: 40% 40% 20%; margin-inline: calc(3ch + 14px + 14px) 0; font-size: 11px; color: var(--faint); }
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; }
+</style>
+</head>
+
+<body data-lesson="04">
+<main class="stage">
+  <header>
+    <p class="eyebrow"><b>04</b> Interpretar las respuestas</p>
+    <h1 class="ch-title">umbrales</h1>
+    <p class="ch-desc">La API devuelve probabilidades; la decisión final es tuya. Elige umbrales según lo que cueste equivocarse y trata los <code>refusal</code>.</p>
+  </header>
+
+  <section class="scene">
+    <p class="q"><span class="tag" style="--c: var(--predicate)">predicate</span><span>Is this review spam? Yes: its main goal is to promote something or send readers elsewhere. No: a genuine opinion about the product, positive or negative. <span class="muted">· 5 peticiones en paralelo</span></span></p>
+    <div class="legend">
+      <span class="verdict yes">publish · &lt; 0.4</span>
+      <span class="verdict mid">review · 0.4 – 0.8</span>
+      <span class="verdict no">hide · ≥ 0.8</span>
+    </div>
+    <div class="reviews" id="reviews"></div>
+  </section>
+</main>
+
+<aside class="panel" aria-label="Editor del ejercicio">
+  <p class="goal"><b>Reto</b><span>Modera cinco reseñas: publica, oculta o manda a revisión según la probabilidad de spam.</span></p>
+  <p class="explain"><b>Dos umbrales y una zona gris.</b> Ocultar una reseña buena molesta; publicar spam también. Ajusta los umbrales con ejemplos reales etiquetados. Si una respuesta es <code>refusal</code>, el modelo no ha contestado esa pregunta: mándala a una persona.</p>
+</aside>
+
+<script type="text/plain" id="exercise" data-file="moderate.js">
+import OpenAI from "openai"
+
+const client = new OpenAI()
+
+const reviews = [
+  "Me encanta, el corazón pixelado es precioso.",
+  "¡¡Gana seguidores GRATIS en el enlace de mi perfil!!",
+  "Buena taza. Si queréis más baratas, escribidme por privado.",
+  "Llegó rápido, aunque es más pequeña de lo que pensaba.",
+  "10/10, mi café ahora sabe a código.",
+]
+
+const HIDE = 0.8 // spam casi seguro
+const REVIEW = 0.4 // zona gris: que lo mire una persona
+
+const decisions = await Promise.all( //__ lanza todas las peticiones en paralelo
+  reviews.map((text) =>
+    client.decisions.create({
+      model: "gpt-6-luna",
+      input: text,
+      questions: [
+        {
+          type: "predicate",
+          name: "spam",
+          instructions:
+            "Is this review spam? " +
+            "Yes: its main goal is to promote something or send readers elsewhere. " +
+            "No: a genuine opinion about the product, positive or negative.",
+        },
+      ],
+    })
+  )
+)
+
+decisions.forEach((decision, i) => {
+  const [answer] = decision.answers
+  let action = "publish"
+  if (answer.type === "refusal") action = "review" //__ si el modelo no responde, que revise una persona
+  else if (answer.probability >= HIDE) action = "hide" //__ por encima del umbral alto
+  else if (answer.probability >= REVIEW) action = "review" //__ la zona gris
+  console.log(`#${i + 1}`, action, answer.probability)
+})
+</script>
+<script>
+  const REVIEWS = [
+    'Me encanta, el corazón pixelado es precioso.',
+    '¡¡Gana seguidores GRATIS en el enlace de mi perfil!!',
+    'Buena taza. Si queréis más baratas, escribidme por privado.',
+    'Llegó rápido, aunque es más pequeña de lo que pensaba.',
+    '10/10, mi café ahora sabe a código.'
+  ]
+  const action = (a) => !a ? null : a.type === 'refusal' ? 'review' : a.probability >= 0.8 ? 'hide' : a.probability >= 0.4 ? 'review' : 'publish'
+  const kind = { publish: 'yes', review: 'mid', hide: 'no' }
+
+  window.renderStage = ({ calls }) => {
+    ui.$('#reviews').innerHTML = REVIEWS.map((text, i) => {
+      const a = calls[i]?.response?.answers?.[0]
+      const act = action(a)
+      const p = a?.probability
+      return `
+        <article class="card review ${act ?? ''}" style="--p:${p ?? 0}">
+          <b>${i + 1}</b>
+          <p>${ui.esc(text)}</p>
+          <span class="bar"><i></i><span class="mark" style="--at:.4"></span><span class="mark" style="--at:.8"></span></span>
+          <span class="v" data-live>${ui.fix(p)}</span>
+          <span class="verdict ${act ? kind[act] : ''}" data-live>${act ?? '—'}</span>
+        </article>`
+    }).join('')
+  }
+</script>
+<script type="application/json" id="mock">[{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"spam","probability":0}],"usage":{"input_tokens":190,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":190}},{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"spam","probability":0.96}],"usage":{"input_tokens":192,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":192}},{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"spam","probability":0.66}],"usage":{"input_tokens":197,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":197}},{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"spam","probability":0}],"usage":{"input_tokens":194,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":194}},{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"spam","probability":0.03}],"usage":{"input_tokens":191,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":191}}]</script>
+<script src="assets/highlight.js"></script>
+<script src="assets/stage.js"></script>
+<script src="assets/lesson.js"></script>
+</body>
+</html>

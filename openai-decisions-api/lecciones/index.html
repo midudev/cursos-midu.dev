@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Lecciones · Decisions API</title>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-pixel/GeistPixelVF.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-mono/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="assets/lesson.css" />
+</head>
+
+<body>
+<main class="index">
+  <p class="eyebrow"><b>▪</b> Curso · OpenAI Decisions API</p>
+  <h1 class="index-title">decisions<br />api</h1>
+  <p class="index-desc">Once retos para aprender a preguntarle cosas a un modelo y recibir respuestas tipadas: probabilidades, opciones y puntuaciones. Cada página tiene el resultado a la izquierda y el código a la derecha con las líneas clave vacías: rellénalas y se ejecuta de verdad contra <code>POST /v1/decisions</code>. Añade <code>?solucion</code> a la URL para abrirla resuelta o <code>?mock</code> para usar respuestas grabadas sin llamar a la API.</p>
+  <ol class="lesson-list">
+    <li>
+      <a class="lesson-card" href="00-predicate.html" style="--c: var(--blue)">
+        <header><span class="num">00</span><span class="api">predicate · model · input · questions</span></header>
+        <div>
+          <h2>Tu primera decisión</h2>
+          <p>Pregunta si corresponde un reembolso y recibe una probabilidad.</p>
+        </div>
+        <footer><span>4 líneas por rellenar</span><span>Empezar →</span></footer>
+      </a>
+    </li>
+    <li>
+      <a class="lesson-card" href="01-choice.html" style="--c: var(--purple)">
+        <header><span class="num">01</span><span class="api">choice · choices · confidence</span></header>
+        <div>
+          <h2>Enruta un mensaje</h2>
+          <p>Elige el departamento correcto de una lista cerrada, con opción de escape.</p>
+        </div>
+        <footer><span>5 líneas por rellenar</span><span>Empezar →</span></footer>
+      </a>
+    </li>
+    <li>
+      <a class="lesson-card" href="02-score.html" style="--c: var(--pink)">
+        <header><span class="num">02</span><span class="api">score · levels · probabilities</span></header>
+        <div>
+          <h2>Puntúa con una rúbrica</h2>
+          <p>Mide la gravedad de un error en una escala ordenada y entiende de dónde sale el número.</p>
+        </div>
+        <footer><span>4 líneas por rellenar</span><span>Empezar →</span></footer>
+      </a>
+    </li>
+    <li>
+      <a class="lesson-card" href="03-multiple.html" style="--c: var(--blue)">
+        <header><span class="num">03</span><span class="api">questions[] · name</span></header>
+        <div>
+          <h2>Varias preguntas, una petición</h2>
+          <p>Mezcla predicate, choice y score sobre el mismo ticket y lee cada respuesta por su nombre.</p>
+        </div>
+        <footer><span>4 líneas por rellenar</span><span>Empezar →</span></footer>
+      </a>
+    </li>
+    <li>
+      <a class="lesson-card" href="04-thresholds.html" style="--c: var(--amber)">
+        <header><span class="num">04</span><span class="api">umbrales · refusal · Promise.all</span></header>
+        <div>
+          <h2>Modera reseñas con umbrales</h2>
+          <p>Convierte probabilidades en acciones: publicar, ocultar o mandar a revisión.</p>
+        </div>
+        <footer><span>4 líneas por rellenar</span><span>Empezar →</span></footer>
+      </a>
+    </li>
+    <li>
+      <a class="lesson-card" href="05-images.html" style="--c: var(--green)">
+        <header><span class="num">05</span><span class="api">input_image · base64</span></header>
+        <div>
+          <h2>Detecta daños en una foto</h2>
+          <p>Manda la foto del producto junto al texto y averigua si llegó roto.</p>
+        </div>
+        <footer><span>4 líneas por rellenar</span><span>Empezar →</span></footer>
+      </a>
+    </li>
+    <li>
+      <a class="lesson-card" href="06-reference.html" style="--c: var(--green)">
+        <header><span class="num">06</span><span class="api">instructions[] · input_image</span></header>
+        <div>
+          <h2>Compara con una referencia</h2>
+          <p>Una imagen compartida en el input y una imagen distinta en cada pregunta.</p>
+        </div>
+        <footer><span>4 líneas por rellenar</span><span>Empezar →</span></footer>
+      </a>
+    </li>
+    <li>
+      <a class="lesson-card" href="07-json.html" style="--c: var(--amber)">
+        <header><span class="num">07</span><span class="api">input_json · data</span></header>
+        <div>
+          <h2>Evalúa datos JSON</h2>
+          <p>Cruza un ticket con los datos del pedido para confirmar un cobro duplicado.</p>
+        </div>
+        <footer><span>4 líneas por rellenar</span><span>Empezar →</span></footer>
+      </a>
+    </li>
+    <li>
+      <a class="lesson-card" href="08-tools.html" style="--c: var(--purple)">
+        <header><span class="num">08</span><span class="api">function_call · call_id</span></header>
+        <div>
+          <h2>Evalúa a tu agente</h2>
+          <p>Pasa la conversación con sus tool calls y pilla al agente inventándose una fecha.</p>
+        </div>
+        <footer><span>4 líneas por rellenar</span><span>Empezar →</span></footer>
+      </a>
+    </li>
+    <li>
+      <a class="lesson-card" href="09-cache.html" style="--c: var(--green)">
+        <header><span class="num">09</span><span class="api">prompt_cache_key · breakpoint · usage</span></header>
+        <div>
+          <h2>Reutiliza el input con caché</h2>
+          <p>Evalúa varios tickets contra la misma política y paga menos por el prefijo repetido.</p>
+        </div>
+        <footer><span>4 líneas por rellenar</span><span>Empezar →</span></footer>
+      </a>
+    </li>
+    <li>
+      <a class="lesson-card" href="10-project.html" style="--c: var(--fg)">
+        <header><span class="num">10</span><span class="api">todo junto</span></header>
+        <div>
+          <h2>Proyecto: triaje completo</h2>
+          <p>Texto, JSON, foto y política en una petición. Tu código decide si actúa o escala.</p>
+        </div>
+        <footer><span>6 líneas por rellenar</span><span>Empezar →</span></footer>
+      </a>
+    </li>
+  </ol>
+</main>
+</body>
+</html>

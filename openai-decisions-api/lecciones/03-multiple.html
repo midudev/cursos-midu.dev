@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>03 · varias preguntas — Lecciones de la Decisions API</title>
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-pixel/GeistPixelVF.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-mono/GeistMono-Variable.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="stylesheet" href="assets/lesson.css" />
+<style>
+  .widget .body { display: grid; gap: 12px; align-content: start; }
+  .widget .q { font-size: 12px; color: var(--muted); }
+  .widget .rows { gap: 6px; }
+  .widget .row { grid-template-columns: minmax(8ch, auto) 1fr 4ch; font-size: 12px; }
+  .widget .row .bar { height: 10px; }
+  #dep { --c-pick: var(--choice); }
+  #urg { --c-pick: var(--score); }
+  .order { display: flex; gap: 8px; align-items: center; color: var(--faint); font-size: 12px; }
+</style>
+</head>
+
+<body data-lesson="03">
+<main class="stage">
+  <header>
+    <p class="eyebrow"><b>03</b> Varias preguntas, una petición</p>
+    <h1 class="ch-title">triaje</h1>
+    <p class="ch-desc">Hasta 400 preguntas por petición, de cualquier tipo, sobre el mismo <code>input</code>. Las respuestas llegan en el mismo orden y con el <code>name</code> que les diste.</p>
+  </header>
+
+  <section class="scene">
+    <article class="card">
+      <header><span><i></i>input</span><span>ticket #4521</span></header>
+      <div class="body"><p class="msg">“<span data-edit="input">La taza llegó rota y era un regalo para el sábado. ¿Me mandáis otra o me devolvéis el dinero?</span>”</p></div>
+    </article>
+
+    <div class="grid-3">
+      <article class="card widget" id="w-refund" style="--c: var(--predicate)">
+        <header><span><i></i>wants_refund</span><span class="tag">predicate</span></header>
+        <div class="body">
+          <p class="q">Does the customer ask for their money back, even as one option?</p>
+          <div class="meter sm" id="refund"><b class="val">—</b><div class="bar"><i></i></div></div>
+        </div>
+      </article>
+      <article class="card widget" id="w-dep" style="--c: var(--choice)">
+        <header><span><i></i>department</span><span class="tag">choice</span></header>
+        <div class="body">
+          <p class="q">Which team should handle this ticket?</p>
+          <div class="rows" id="dep"></div>
+        </div>
+      </article>
+      <article class="card widget" id="w-urg" style="--c: var(--score)">
+        <header><span><i></i>urgency</span><span class="tag">score</span></header>
+        <div class="body">
+          <p class="q">How urgent is this for the customer?</p>
+          <div class="meter sm" id="urgency"><b class="val">—</b></div>
+          <div class="rows" id="urg"></div>
+        </div>
+      </article>
+    </div>
+
+    <p class="order">questions[0..2] <span>→</span> answers[0..2] · mismo orden, mismo <code>name</code></p>
+  </section>
+</main>
+
+<aside class="panel" aria-label="Editor del ejercicio">
+  <p class="goal"><b>Reto</b><span>Haz tres preguntas de tipos distintos en una sola petición y léelas por su <code>name</code>.</span></p>
+  <p class="explain"><b>Una petición, muchas respuestas.</b> Agrupa las preguntas independientes sobre el mismo input. Si una decisión depende de otra (primero ¿está roto? y luego ¿qué reparación?), haz dos peticiones.</p>
+</aside>
+
+<script type="text/plain" id="exercise" data-file="triage.js">
+import OpenAI from "openai"
+
+const client = new OpenAI()
+
+const decision = await client.decisions.create({
+  model: "gpt-6-luna",
+  input:
+    "La taza llegó rota y era un regalo para el sábado. " + //~ input
+    "¿Me mandáis otra o me devolvéis el dinero?", //~ input
+  questions: [
+    {
+      type: "predicate",
+      name: "wants_refund",
+      instructions: "Does the customer ask for their money back, even as one option?",
+    },
+    {
+      type: "choice",
+      name: "department", //__ cada pregunta con su name
+      instructions: "Which team should handle this ticket?",
+      choices: [
+        { value: "billing" },
+        { value: "shipping" },
+        { value: "other" },
+      ],
+    },
+    {
+      type: "score", //__ la urgencia es una escala ordenada
+      name: "urgency",
+      instructions: "How urgent is this for the customer?",
+      levels: [
+        { label: "Low", description: "No time pressure." },
+        { label: "Medium", description: "Wants it soon, no specific date." },
+        { label: "High", description: "Mentions a close date or deadline." },
+      ],
+    },
+  ],
+})
+
+const answers = Object.fromEntries(
+  decision.answers.map((a) => [a.name, a]) //__ indexa cada respuesta por su name
+)
+console.log(answers.wants_refund.probability)
+console.log(answers.department.choice) //__ la opción elegida
+console.log(answers.urgency.score)
+</script>
+<script>
+  window.renderStage = ({ calls }) => {
+    const r = ui.answers(calls[0])
+    ui.meter('#refund', r.wants_refund?.probability)
+    ui.dist('#dep', [{ value: 'billing' }, { value: 'shipping' }, { value: 'other' }], r.department)
+    ui.meter('#urgency', r.urgency?.score, 2)
+    const top = r.urgency?.probabilities?.reduce((m, p) => (p.probability > m.probability ? p : m))
+    ui.dist('#urg', [{ value: 0, label: 'Low' }, { value: 1, label: 'Medium' }, { value: 2, label: 'High' }], r.urgency, { picked: top ? String(top.value) : null })
+    ui.toggle('#w-refund', 'is-on', r.wants_refund)
+    ui.toggle('#w-dep', 'is-on', r.department)
+    ui.toggle('#w-urg', 'is-on', r.urgency)
+  }
+</script>
+<script type="application/json" id="mock">[{"model":"gpt-6-luna","answers":[{"type":"predicate","name":"wants_refund","probability":1},{"type":"choice","name":"department","choice":"shipping","probabilities":[{"value":"billing","probability":0},{"value":"shipping","probability":0.98},{"value":"other","probability":0.02}],"confidence":0.97},{"type":"score","name":"urgency","score":2,"probabilities":[{"value":0,"label":"Low","probability":0},{"value":1,"label":"Medium","probability":0},{"value":2,"label":"High","probability":1}],"confidence":1}],"usage":{"input_tokens":424,"input_tokens_details":{"cached_tokens":0,"cache_write_tokens":0},"output_tokens":0,"output_tokens_details":{"reasoning_tokens":0},"total_tokens":424}}]</script>
+<script src="assets/highlight.js"></script>
+<script src="assets/stage.js"></script>
+<script src="assets/lesson.js"></script>
+</body>
+</html>
