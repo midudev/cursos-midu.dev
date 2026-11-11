@@ -22,7 +22,8 @@ const TYPES = {
   '.md': 'text/markdown; charset=utf-8',
   '.jpg': 'image/jpeg',
   '.png': 'image/png',
-  '.svg': 'image/svg+xml'
+  '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2'
 }
 
 const dim = (s) => `\x1b[2m${s}\x1b[0m`

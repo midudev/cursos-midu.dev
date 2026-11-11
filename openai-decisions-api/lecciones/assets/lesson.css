@@ -4,13 +4,13 @@
    ────────────────────────────────────────────────────────────── */
 @font-face {
   font-family: "Geist Mono";
-  src: url("https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-mono/GeistMono-Variable.woff2") format("woff2");
+  src: url("fonts/GeistMono-Variable.woff2") format("woff2");
   font-weight: 100 900;
   font-display: swap;
 }
 @font-face {
   font-family: "Geist Pixel";
-  src: url("https://cdn.jsdelivr.net/npm/geist@1.9.1/dist/fonts/geist-pixel/GeistPixelVF.woff2") format("woff2");
+  src: url("fonts/GeistPixelVF.woff2") format("woff2");
   font-display: block;
 }
 
